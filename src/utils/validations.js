@@ -16,7 +16,7 @@ function validateInput(image, customer_code, measure_datetime, measure_type) {
         errors.push('Tipo de medição (measure_type) é obrigatório.');
     }
     else if (measure_type.toUpperCase() !== 'WATER' && measure_type.toUpperCase() !== 'GAS') {
-        errors.push('Tipo de medição (measure_type) inválido. Deve ser "WATER" ou "GAS".');
+        errors.push('Tipo de medição (measure_type) inválido. Deve ser WATER ou GAS.');
     }
     return errors;
 }

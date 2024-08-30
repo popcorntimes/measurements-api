@@ -15,41 +15,77 @@ const fileManager = new GoogleAIFileManager(apiKey!);
 const modelId = 'gemini-1.5-pro';
 const model = configuration.getGenerativeModel({ model: modelId });
 
+const cache: Map<string, string> = new Map(); 
+
 export const geminiService: GeminiService = {
   processImage: async (imageBase64: string, customer_code: string, measure_datetime: string, measure_type: string) => {
-    try {
-      const imageBuffer = Buffer.from(imageBase64, 'base64');
-      const tempFilePath = path.join(os.tmpdir(), 'image.jpg'); 
-      fs.writeFileSync(tempFilePath, imageBuffer);
+    const cacheKey = `${customer_code}-${measure_datetime}-${measure_type}`;
 
-      const uploadResponse = await fileManager.uploadFile(tempFilePath, {
-        mimeType: "image/jpeg",
-        displayName: "Image",
-      });
-
-      console.log(`Uploaded file ${uploadResponse.file.displayName} as: ${uploadResponse.file.uri}`);
-
-      const prompt = `Read measurement of type ${measure_type.toLowerCase} in the image and return only the numeric value`;
-
-      const result = await model.generateContent([
-        {
-          fileData: {
-            mimeType: uploadResponse.file.mimeType,
-            fileUri: uploadResponse.file.uri
-          }
-        },
-        { text: prompt },
-      ]);
-
-      const responseText = result.response.text();
-
-      fs.unlinkSync(tempFilePath);
-
-      return responseText;
-
-    } catch (error) {
-      console.error('Erro ao processar a imagem com o Gemini:', error);
-      throw error;
+    // Verifica se o resultado está em cache
+    if (cache.has(cacheKey)) {
+      console.log(`Resultado em cache encontrado para: ${cacheKey}`);
+      return cache.get(cacheKey)!;
     }
+
+    const maxAttempts = 3;
+    let attempt = 0;
+    let responseText: string | undefined;
+
+    while (attempt < maxAttempts) {
+      try {
+        const imageBuffer = Buffer.from(imageBase64, 'base64');
+        const tempFilePath = path.join(os.tmpdir(), 'image.jpg');
+        fs.writeFileSync(tempFilePath, imageBuffer);
+
+        const uploadResponse = await fileManager.uploadFile(tempFilePath, {
+          mimeType: "image/jpeg",
+          displayName: "Image",
+        });
+
+        console.log(`Arquivo enviado ${uploadResponse.file.displayName} como: ${uploadResponse.file.uri}`);
+
+        const prompt = `Leia a medição na imagem e retorne apenas o valor numérico`;
+
+        console.log(`Enviando prompt para o modelo: ${prompt}`);
+
+        const result = await model.generateContent([
+          {
+            fileData: {
+              mimeType: uploadResponse.file.mimeType,
+              fileUri: uploadResponse.file.uri
+            }
+          },
+          { text: prompt },
+        ]);
+
+        console.log(`Resposta da API: ${JSON.stringify(result.response)}`);
+
+        responseText = result.response.text();
+
+        if (!responseText) {
+          throw new Error('Resposta da API está vazia.');
+        }
+
+        // Armazena o resultado no cache
+        cache.set(cacheKey, responseText);
+
+        fs.unlinkSync(tempFilePath);
+        return responseText;
+
+      } catch (err) {
+        if (err instanceof Error) {
+          console.error(`Erro ao processar a imagem com o Gemini (tentativa ${attempt + 1}):`, err.message);
+        } else {
+          console.error('Erro desconhecido ao processar a imagem com o Gemini:', err);
+        }
+
+        attempt++;
+        if (attempt === maxAttempts) {
+          throw new Error('Falha ao processar a imagem após várias tentativas.');
+        }
+      }
+    }
+
+    throw new Error('Falha ao processar a imagem após várias tentativas.');
   },
 };

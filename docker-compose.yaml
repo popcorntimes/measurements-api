@@ -1,9 +1,23 @@
 services:
-  app:
+  api:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
-    env_file:
-      - .env
+    depends_on:
+      - db
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      DATABASE_URL: postgres://postgres:yourpassword@db:5432/measurements
+
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: yourpassword
+      POSTGRES_DB: measurements
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/scripts:/docker-entrypoint-initdb.d
