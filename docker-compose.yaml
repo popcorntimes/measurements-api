@@ -10,6 +10,8 @@ services:
     environment:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       DATABASE_URL: postgres://postgres:yourpassword@db:5432/measurements
+    volumes:
+      - ./:/usr/src/app  # Mapeia o diretório local atual para o diretório /usr/src/app no container
 
   db:
     image: postgres:13
