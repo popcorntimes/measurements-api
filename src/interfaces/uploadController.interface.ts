@@ -1,8 +1,5 @@
 import { Request, Response } from 'express';
-import { GeminiService } from '../interfaces/geminiService.interface';
 
 export interface UploadController {
-    (geminiService: GeminiService): {
-      handle(req: Request, res: Response): Promise<Response>;
-    };
+  handle(req: Request, res: Response, measure_uuid: string, measure_value: string, image_url: string): Promise<Response>;
 }

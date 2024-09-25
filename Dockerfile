@@ -1,27 +1,30 @@
+# Use a imagem oficial do Node.js
 FROM node:18
 
+# Crie o diretório de trabalho
 WORKDIR /usr/src/app
 
-RUN git clone -b feature/database https://github.com/popcorntimes/measurements-api .
-
+# Copie o package.json e o package-lock.json
 COPY package*.json ./
 
+# Instale as dependências
 RUN npm install
 
-# Instalar o Tesseract OCR
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    tesseract-ocr \
-    tesseract-ocr-por \
-    libtesseract-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN npm install -g typescript
-
+# Copie o restante dos arquivos do projeto
 COPY . .
 
-# Limpar o diretório de build e recompilar
-RUN rm -rf dist/ && npm run build
+# Instale o cliente PostgreSQL
+RUN apt-get update && apt-get install -y postgresql-client
 
+# Compile o código TypeScript
+RUN npm run build
+
+# Copie o script de entrada
+COPY ./entrypoint.sh /usr/src/app/entrypoint.sh
+RUN chmod +x /usr/src/app/entrypoint.sh           
+
+# Exponha a porta que o aplicativo vai rodar
 EXPOSE 3000
 
-CMD ["sh", "-c", "npm run build && npm start"]
+# Inicie o servidor da API
+CMD ["sh", "/usr/src/app/entrypoint.sh"]
