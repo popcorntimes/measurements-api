@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import multer from 'multer';
+import * as os from 'os';
 import { IUploadController } from '../interfaces/IUploadController';
 
-const upload = multer({ dest: 'img/' });
+const upload = multer({ dest: os.tmpdir() });
 
 export const createUploadRoutes = (uploadController: IUploadController) => {
   const router = Router();

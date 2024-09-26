@@ -49,19 +49,36 @@ export class MeasuresServiceImpl implements IMeasuresService {
   }
 
   async createMeasure(newMeasure: Measure): Promise<void> {
-    await this.db.query(
-      `INSERT INTO measures (measure_uuid, measure_datetime, measure_type, has_confirmed, image_url, measure_value, customer_code) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [
-        newMeasure.measure_uuid,
-        newMeasure.measure_datetime,
-        newMeasure.measure_type,
-        newMeasure.has_confirmed,
-        newMeasure.image_url,
-        newMeasure.measure_value,
-        newMeasure.customer_code,
-      ]
-    );
+    try {
+      // Verificar se o cliente já existe na tabela customer_measures
+      const customerExists = await this.db.query(
+        'SELECT 1 FROM customer_measures WHERE customer_code = $1',
+        [newMeasure.customer_code]
+      );
+
+      // Se o cliente não existir, inserir na tabela customer_measures
+      if (customerExists.rows.length === 0) {
+        await this.db.query('INSERT INTO customer_measures (customer_code) VALUES ($1)', [newMeasure.customer_code]);
+      }
+
+      // Inserir a nova medida na tabela measures
+      await this.db.query(
+        `INSERT INTO measures (measure_uuid, measure_datetime, measure_type, has_confirmed, image_url, measure_value, customer_code) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          newMeasure.measure_uuid,
+          newMeasure.measure_datetime,
+          newMeasure.measure_type,
+          newMeasure.has_confirmed,
+          newMeasure.image_url,
+          newMeasure.measure_value,
+          newMeasure.customer_code,
+        ]
+      );
+    } catch (error) {
+      console.error('Error creating measure:', error);
+      throw error; // Propagar o erro para a controller
+    }
   }
 
   async findMeasureForCurrentMonth(customer_code: string, measure_datetime: string, measure_type: string): Promise<Measure | undefined> {
@@ -83,4 +100,6 @@ export class MeasuresServiceImpl implements IMeasuresService {
     }
     return undefined;
   }
+
+  
 }

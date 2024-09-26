@@ -30,7 +30,7 @@ export class GeminiServiceImpl implements IGeminiService {
     // Verifica se o resultado está em cache e se ainda é válido
     const cachedResult = cache.get(cacheKey);
     if (cachedResult && cachedResult.timestamp > Date.now() - cacheExpirationTime) {
-      console.log(`Cached result found: ${cacheKey}`);
+      //console.log(`Cached result found: ${cacheKey}`);
       return cachedResult.value;
     }
 
@@ -51,7 +51,7 @@ export class GeminiServiceImpl implements IGeminiService {
         displayName: path.basename(imagePath),
       });
 
-      console.log(`Uploaded file ${uploadResponse.file.displayName} as: ${uploadResponse.file.uri}`);
+      //console.log(`Uploaded file ${uploadResponse.file.displayName} as: ${uploadResponse.file.uri}`);
 
       // Prompt que será enviado ao modelo
       const prompt = `Read the measurement in the digital meter and return only its numerical value. If it's not a digital meter, don't return anything.`;

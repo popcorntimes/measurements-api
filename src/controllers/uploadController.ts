@@ -17,10 +17,10 @@ export class UploadControllerImpl implements IUploadController {
   handle = async (req: Request, res: Response): Promise<Response> => {
     try {
       const { customer_code, measure_datetime, measure_type } = req.body;
-      const image = req.file?.path;
+      const imagePath = req.file?.path; // Obtém o caminho da imagem do objeto req.file
 
       // 1. Validação dos dados de entrada
-      const validationErrors = validateInput(image, customer_code, measure_datetime, measure_type);
+      const validationErrors = validateInput(imagePath, customer_code, measure_datetime, measure_type);
       if (validationErrors.length > 0) {
         return res.status(400).json({
           error_code: 'INVALID_DATA',
@@ -28,16 +28,8 @@ export class UploadControllerImpl implements IUploadController {
         });
       }
 
-      if (!image) {
-        return res.status(400).json({
-          error_code: 'INVALID_DATA',
-          error_description: 'Image file was not provided',
-        });
-      }
-
       // 2. Verificar se já existe uma leitura para o cliente e tipo no mês atual
       const existingMeasure = await this.measuresService.findMeasureForCurrentMonth(customer_code, measure_datetime, measure_type);
-
       if (existingMeasure) {
         return res.status(409).json({
           error_code: 'DOUBLE_REPORT',
@@ -46,7 +38,7 @@ export class UploadControllerImpl implements IUploadController {
       }
 
       // 3. Consulta a API do Gemini
-      const measure_value = await this.geminiService.processImage(image, customer_code, measure_datetime, measure_type);
+      const measure_value = await this.geminiService.processImage(imagePath!, customer_code, measure_datetime, measure_type);
 
       // 4. Salvar a medição no banco de dados
       const newMeasure = {
@@ -67,6 +59,7 @@ export class UploadControllerImpl implements IUploadController {
         measure_value: newMeasure.measure_value,
         measure_uuid: newMeasure.measure_uuid,
       });
+
     } catch (error) {
       console.error('Error processing image:', error);
       return res.status(500).json({ error: 'Error processing image' });
