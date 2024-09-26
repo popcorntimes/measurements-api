@@ -1,4 +1,4 @@
-import { Measure } from '../controllers/uploadController';
+import { Measure } from '../models/Measure';
 
 export const measures: { customer_code: string; measures: Measure[] }[] = [];
 

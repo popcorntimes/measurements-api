@@ -1,24 +1,24 @@
-import { Router, Request, Response } from 'express';
-import { MeasuresService } from '../services/measuresService';
-import { listController } from '../controllers/listController';
+import { Router } from 'express';
+import { IListController } from '../interfaces/IListController';
 
-export const listRoutes = (measuresService: MeasuresService): Router => {
+export const createListRoutes = (listController: IListController) => {
   const router = Router();
-  const controller = listController(measuresService);
 
-  router.get('/:customer_code/list', async (req: Request, res: Response) => {
-    const { customer_code } = req.params;
-    const measure_type = typeof req.query.measure_type === 'string' ? req.query.measure_type : undefined;
-
-    console.log('Received request to list measures for customer:', customer_code);
-    console.log('Optional measure type:', measure_type);
-
+  router.get('/', async (req, res) => {
     try {
-      const response = await controller.handle(req, res, customer_code, measure_type);
-      return response;
+      return await listController.listAllMeasures(req, res);
     } catch (error) {
-      console.error('Erro ao listar medidas:', error);
-      return res.status(500).json({ error: 'Erro ao listar medidas.' });
+      console.error('Error listing measures:', error);
+      return res.status(500).json({ error: 'Error listing measures' });
+    }
+  });
+
+  router.get('/:customer_code', async (req, res) => {
+    try {
+      return await listController.handle(req, res);
+    } catch (error) {
+      console.error('Error listing measures:', error);
+      return res.status(500).json({ error: 'Error listing measures' });
     }
   });
 

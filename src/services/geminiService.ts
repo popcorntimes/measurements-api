@@ -4,7 +4,7 @@ import * as path from 'path';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { GoogleAIFileManager } from '@google/generative-ai/server';
 import * as dotenv from 'dotenv';
-import { GeminiService } from '../interfaces/geminiService.interface';
+import { IGeminiService } from '../interfaces/IGeminiService';
 
 dotenv.config();
 
@@ -14,43 +14,47 @@ const fileManager = new GoogleAIFileManager(apiKey!);
 const modelId = 'gemini-1.5-pro';
 const model = configuration.getGenerativeModel({ model: modelId });
 
-const cache: Map<string, string> = new Map();
+// Interface para o resultado do cache
+interface CacheResult {
+  value: string;
+  timestamp: number;
+}
 
-export const geminiService: GeminiService = {
-  processImage: async (imagePath: string, customer_code: string, measure_datetime: string, measure_type: string) => {
+const cache: Map<string, CacheResult> = new Map();
+const cacheExpirationTime = 60 * 60 * 1000; // 1 hora em milissegundos
+
+export class GeminiServiceImpl implements IGeminiService {
+  async processImage(imagePath: string, customer_code: string, measure_datetime: string, measure_type: string): Promise<string> {
     const cacheKey = `${customer_code}-${measure_datetime}-${measure_type}`;
 
-    // Verifica se o resultado está em cache
-    if (cache.has(cacheKey)) {
-      console.log(`Cached result for ${cacheKey}`);
-      return cache.get(cacheKey)!;
+    // Verifica se o resultado está em cache e se ainda é válido
+    const cachedResult = cache.get(cacheKey);
+    if (cachedResult && cachedResult.timestamp > Date.now() - cacheExpirationTime) {
+      console.log(`Cached result found: ${cacheKey}`);
+      return cachedResult.value;
     }
 
-    try {
-      //console.log(`Processing image ${imagePath}`);
-      console.log(`Parameters - customer_code: ${customer_code}, measure_datetime: ${measure_datetime}, measure_type: ${measure_type}`);
+    let tempFilePath = ''; // Inicializa tempFilePath
 
+    try {
       // Lê o arquivo e converte a imagem para base64
       const imageBuffer = fs.readFileSync(imagePath);
       const imageBase64 = imageBuffer.toString('base64');
-      //console.log(`Reading image and converting to base 64`);
 
       // Cria um arquivo temporário com o buffer da imagem em base64
-      const tempFilePath = path.join(os.tmpdir(), 'image.jpg');
+      tempFilePath = path.join(os.tmpdir(), 'image.jpg');
       fs.writeFileSync(tempFilePath, Buffer.from(imageBase64, 'base64'));
-      //console.log(`Temp file created ${tempFilePath}`);
 
       // Faz o upload da imagem para o Google
       const uploadResponse = await fileManager.uploadFile(tempFilePath, {
-        mimeType: "image/jpeg",
+        mimeType: 'image/jpeg',
         displayName: path.basename(imagePath),
       });
 
-      //console.log(`Uploaded file ${uploadResponse.file.displayName} as: ${uploadResponse.file.uri}`);
+      console.log(`Uploaded file ${uploadResponse.file.displayName} as: ${uploadResponse.file.uri}`);
 
       // Prompt que será enviado ao modelo
       const prompt = `Read the measurement in the digital meter and return only its numerical value. If it's not a digital meter, don't return anything.`;
-      console.log(`Sending prompt to model: ${prompt}`);
 
       // Gera o conteúdo baseado na imagem e no prompt
       const result = await model.generateContent([
@@ -64,7 +68,6 @@ export const geminiService: GeminiService = {
       ]);
 
       const responseText = result.response.text();
-      console.log(`API response: ${responseText}`);
 
       if (!responseText) {
         throw new Error('Empty API response');
@@ -74,18 +77,19 @@ export const geminiService: GeminiService = {
         throw new Error('Error processing image: Invalid measurement value');
       }
 
-      // Armazena o resultado no cache
-      cache.set(cacheKey, responseText);
-
-      // Remove o arquivo temporário
-      fs.unlinkSync(tempFilePath);
-      //console.log(`Temp file removed`);
+      // Armazena o resultado no cache com timestamp
+      cache.set(cacheKey, { value: responseText, timestamp: Date.now() });
 
       return responseText;
-
     } catch (error) {
       console.error(`Error processing image with Gemini`, error);
-      return 'Error processing image';
+      throw new Error('Error processing image'); 
+    } finally {
+      // Remove o arquivo temporário, se existir
+      if (tempFilePath && fs.existsSync(tempFilePath)) {
+        fs.unlinkSync(tempFilePath);
+        //console.log(`Temp file removed: ${tempFilePath}`);
+      }
     }
-  },
-};
+  }
+}
